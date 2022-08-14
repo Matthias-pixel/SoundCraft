@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "down": "soundcraft:block/cd_burner_bottom",
+    "up": "soundcraft:block/cd_burner_top",
+    "north": "soundcraft:block/cd_burner_front",
+    "east": "soundcraft:block/cd_burner_sides",
+    "south": "soundcraft:block/cd_burner_back",
+    "west": "soundcraft:block/cd_burner_sides",
+    "particles": "soundcraft:block/cd_burner_sides"
+  }
+}

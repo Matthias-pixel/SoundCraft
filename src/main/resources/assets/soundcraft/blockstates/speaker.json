@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model":  "soundcraft:block/speaker"},
+    "facing=east": { "model":  "soundcraft:block/speaker", "y": 90},
+    "facing=south": { "model":  "soundcraft:block/speaker", "y": 180},
+    "facing=west": { "model":  "soundcraft:block/speaker", "y": 270}
+  }
+}

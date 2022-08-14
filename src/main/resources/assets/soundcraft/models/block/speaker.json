@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "down": "soundcraft:block/speaker_bottom",
+    "up": "soundcraft:block/speaker_top",
+    "north": "soundcraft:block/speaker_front",
+    "east": "soundcraft:block/speaker_sides",
+    "south": "soundcraft:block/speaker_back",
+    "west": "soundcraft:block/speaker_sides",
+    "particles": "soundcraft:block/speaker_sides"
+  }
+}

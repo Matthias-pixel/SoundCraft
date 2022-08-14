@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "soundcraft",
   "version": "${version}",
 
-  "name": "Example Mod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "name": "Sound Craft",
+  "description": "A bunch of sound equipment for your minecraft world.",
   "authors": [
-    "Me!"
+    "Ideaonic703"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "homepage": "",
+    "sources": "https://github.com/Matthias-pixel/SoundCraft"
   },
 
-  "license": "CC0-1.0",
+  "license": "MIT",
   "icon": "assets/modid/icon.png",
 
   "environment": "*",
   "entrypoints": {
     "main": [
-      "net.fabricmc.example.ExampleMod"
+      "de.ideaonic703.soundcraft.SoundCraft"
     ]
   },
   "mixins": [
-    "modid.mixins.json"
+    "soundcraft.mixins.json"
   ],
 
   "depends": {
