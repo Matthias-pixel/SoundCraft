@@ -4,13 +4,10 @@ import net.minecraft.client.item.TooltipContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemUsageContext;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
 import net.minecraft.text.*;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
@@ -37,9 +34,10 @@ public class CDItem extends Item {
     @Override
     public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
         if(stack.hasNbt() && stack.getNbt() != null) {
-            NbtList songs = stack.getNbt().getList("songs", NbtElement.STRING_TYPE);
-            for(NbtElement song : songs) {
-                tooltip.add(Text.literal(song.asString()));
+            NbtList songs = stack.getNbt().getList("songs", NbtElement.COMPOUND_TYPE);
+            for(NbtElement songElement : songs) {
+                NbtCompound song = (NbtCompound) songElement;
+                tooltip.add(Text.literal(song.getString("name")));
             }
         }
     }
