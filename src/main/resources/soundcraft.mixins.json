@@ -8,6 +8,9 @@
   "client": [
     "SoundCraftMixin"
   ],
+  "server": [
+    "MinecraftServerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

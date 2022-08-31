@@ -2,19 +2,22 @@ package de.ideaonic703.soundcraft.screen;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import de.ideaonic703.soundcraft.SoundCraft;
+import de.ideaonic703.soundcraft.network.ModPackets;
+import de.ideaonic703.soundcraft.network.packet.c2s.SoundCraftScreenC2SPacket;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
 
-public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
+public class BurnerScreen extends SoundCraftScreen<BurnerScreenHandler> {
     private static final Identifier TEXTURE = new Identifier(SoundCraft.MOD_ID, "textures/gui/cd_burner_gui.png");
     private static final int PADDING = 2;
     private static final int PLAYLIST_X = 62 + PADDING;
@@ -48,12 +51,14 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
 
     public BurnerScreen(BurnerScreenHandler handler, PlayerInventory inventory, Text title) {
         super(handler, inventory, title);
+        SoundCraft.LOGGER.info("Created BurnerScreen");
         this.handler = handler;
     }
 
     @Override
     protected void init() {
         super.init();
+        SoundCraft.LOGGER.info("Init Burner Screen");
         this.titleX = playerInventoryTitleX;
         this.backgroundWidth = 176;
         this.backgroundHeight = 172;
@@ -74,42 +79,21 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
                 this.menuButtons[i] = new Button(PLAYLIST_WIDTH + PLAYLIST_X - (BUTTON_WIDTH + PADDING) * (i - 1) + PADDING, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT, i, i > 2);
             else
                 this.menuButtons[i] = new Button(BUTTON_X + (BUTTON_WIDTH + PADDING) * i, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT, i, false);
+            final int finalI = i;
+            this.menuButtons[i].registerClickListener(new ClickListener() {
+                @Override
+                public boolean onMouseDown() {
+                    return false;
+                }
+
+                @Override
+                public boolean onMouseUp() {
+                    soundCraftScreenAction(finalI, selectedSong);
+                    return false;
+                }
+            });
         }
-        this.menuButtons[0].registerClickListener(new ClickListener() {
-            @Override
-            public void onMouseDown() {
-
-            }
-            @Override
-            public void onMouseUp() {
-                if(menuButtons[0].isActive())
-                    handler.addSong(selectedSong);
-            }
-        });
-        this.menuButtons[1].registerClickListener(new ClickListener() {
-            @Override
-            public void onMouseDown() {
-
-            }
-            @Override
-            public void onMouseUp() {
-                if(menuButtons[1].isActive())
-                    handler.removeSong(selectedSong);
-            }
-        });
-        this.menuButtons[2].registerClickListener(new ClickListener() {
-            @Override
-            public void onMouseDown() {
-
-            }
-            @Override
-            public void onMouseUp() {
-                if(menuButtons[2].isActive())
-                    handler.deleteSong(selectedSong);
-            }
-        });
     }
-
     private void updatePlaylist(HashMap<String, NbtCompound> playlist) {
         this.playlistButtons = new HashMap<>(playlist.size());
         int i = -1;
@@ -119,14 +103,14 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
             PlaylistButton button = new PlaylistButton(path, i, song);
             button.registerClickListener(new ClickListener() {
                 @Override
-                public void onMouseDown() {
-
+                public boolean onMouseDown() {
+                    return true;
                 }
 
                 @Override
-                public void onMouseUp() {
+                public boolean onMouseUp() {
                     selectedSong = song.getString("path");
-                    updateSelection();
+                    return updateSelection();
                 }
             });
             this.playlistButtons.put(path, button);
@@ -135,7 +119,7 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
         updateSelection();
     }
 
-    private void updateSelection() {
+    private boolean updateSelection() {
         // Playlist buttons
         for (PlaylistButton button : this.playlistButtons.values()) {
             button.setSelected(button.getPath().equals(this.selectedSong));
@@ -160,6 +144,7 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
         }
         menuButtons[3].setActive(true);
         menuButtons[4].setActive(true);
+        return true;
     }
 
     private void renderPlaylist(MatrixStack matrices, int mouseX, int mouseY) {
@@ -245,6 +230,7 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button_type) {
+        SoundCraft.LOGGER.info("Mouse released");
         for (Button button : this.menuButtons) {
             button.onMouseUp(mouseX, mouseY, button_type);
         }
@@ -253,11 +239,13 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
         }
         if(this.scrollButton != null)
             this.scrollButton.onMouseUp(mouseX, mouseY, button_type);
-        return super.mouseReleased(mouseX, mouseY, button_type);
+        super.mouseReleased(mouseX, mouseY, button_type);
+        return true;
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button_type) {
+        SoundCraft.LOGGER.info("Mouse clicked");
         for (Button button : this.menuButtons) {
             button.onMouseDown(mouseX, mouseY, button_type);
         }
@@ -266,7 +254,8 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
         }
         if(this.scrollButton != null)
             this.scrollButton.onMouseDown(mouseX, mouseY, button_type);
-        return super.mouseClicked(mouseX, mouseY, button_type);
+        super.mouseClicked(mouseX, mouseY, button_type);
+        return true;
     }
 
     @Override
@@ -346,26 +335,30 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
             }
         }
 
-        public void onMouseDown(double mouseX, double mouseY, int button) {
+        public boolean onMouseDown(double mouseX, double mouseY, int button) {
+            boolean success = true;
             mouseX -= xOffset;
             mouseY -= yOffset;
             boolean isTouching = this.touching((int) mouseX, (int) mouseY);
             if (isTouching && !this.clicked) {
                 if(this.clickListener != null)
-                    this.clickListener.onMouseDown();
+                    success = this.clickListener.onMouseDown();
                 this.dragX = (int)(mouseX);
                 this.dragY = (int)(mouseY);
             }
             this.clicked = isTouching;
+            return success;
         }
 
-        public void onMouseUp(double mouseX, double mouseY, int button) {
+        public boolean onMouseUp(double mouseX, double mouseY, int button) {
+            boolean success = true;
             if (this.clickListener != null && this.clicked) {
-                this.clickListener.onMouseUp();
+                success = this.clickListener.onMouseUp();
             }
             this.clicked = false;
             this.dragX = 0;
             this.dragY = 0;
+            return success;
         }
 
         public void move(int x, int y) {
@@ -518,9 +511,9 @@ public class BurnerScreen extends HandledScreen<BurnerScreenHandler> {
     }
 
     public interface ClickListener {
-        void onMouseDown();
+        boolean onMouseDown();
 
-        void onMouseUp();
+        boolean onMouseUp();
     }
 
     public interface HoverListener {

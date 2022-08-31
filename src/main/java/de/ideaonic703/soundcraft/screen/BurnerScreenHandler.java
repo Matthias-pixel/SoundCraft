@@ -3,7 +3,14 @@ package de.ideaonic703.soundcraft.screen;
 import com.mojang.brigadier.StringReader;
 import de.ideaonic703.soundcraft.SoundCraft;
 import de.ideaonic703.soundcraft.item.ModItems;
+import de.ideaonic703.soundcraft.network.SoundCraftClientNetworkManager;
+import de.ideaonic703.soundcraft.network.SoundCraftServerNetworkManager;
 import de.ideaonic703.soundcraft.screen.slot.ModCDSlot;
+import de.ideaonic703.soundcraft.util.Pending;
+import de.ideaonic703.soundcraft.util.SoundCraftScreenHandler;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.util.NbtType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
@@ -12,30 +19,56 @@ import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.*;
 import net.minecraft.nbt.visitor.StringNbtWriter;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandler;
+import net.minecraft.screen.ScreenHandlerContext;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
+
 import java.io.*;
 import java.nio.file.Path;
 import java.util.HashMap;
 
-public class BurnerScreenHandler extends ScreenHandler {
+public class BurnerScreenHandler extends ScreenHandler implements SoundCraftScreenHandler {
     private final Inventory inventory;
+    private final ScreenHandlerContext context;
+    private final PlayerEntity player;
     private final Path MUSIC_INDEX = SoundCraft.MUSIC_DIRECTORY.resolve("index.dat");
     private HashMap<String, NbtCompound> playlist = new HashMap<>();
     private PlaylistUpdateHandler updateHandler = null;
-    // /give @s soundcraft:compact_disc{songs:[{name:"Song A", path:"123456"}, {name:"Song B", path:"162543"}, {name:"Song C u", path:"000000"}]}
-    // /give @s soundcraft:compact_disc{songs:[{name:"Colorblind", path:"100983"}, {name:"Invincible", path:"346634"}]}
+    // /give @s soundcraft:compact_disc{songs:[{name:"Song A", path:"100"}, {name:"Song B", path:"101"}, {name:"Song C u", path:"102"}]}
+    // /give @s soundcraft:compact_disc{songs:[{name:"Colorblind", path:"110"}, {name:"Invincible", path:"111"}]}
     //
-    // {songs:[{name:"Colorblind", path:"100983"}, {name:"Invincible", path:"346634"},{name:"SAVED 1", path:"199384"}, {name:"SAVED b", path:"010929"}, {name:"savedSong 3", path:"111325"},{name:"Song A", path:"123456"}, {name:"Song B", path:"162543"}, {name:"Song C u", path:"000000"}, {name:"Song S", path:"967964"}, {name:"Song C u", path:"000000"}, {name:"Song Last", path:"667788"}]}
+    // {songs:[{name:"Colorblind", path:"110"}, {name:"Invincible", path:"111"},{name:"SAVED 1", path:"120"}, {name:"SAVED b", path:"121"}, {name:"savedSong 3", path:"122"},{name:"Song A", path:"100"}, {name:"Song B", path:"101"}, {name:"Song C u", path:"102"}, {name:"Song S", path:"123"}, {name:"Song Last", path:"124"}]}
     public BurnerScreenHandler(int syncId, PlayerInventory playerInventory) {
+        this(syncId, playerInventory, ScreenHandlerContext.EMPTY, playerInventory.player);
+    }
+    public BurnerScreenHandler(int syncId, PlayerInventory playerInventory, ScreenHandlerContext context, PlayerEntity player) {
         super(ModScreenHandlers.BURNER_SCREEN_HANDLER, syncId);
-        this.inventory = new SimpleInventory(1);
-        this.inventory.onOpen(playerInventory.player);
-        this.addSlot(new ModCDSlot(inventory, 0, 17, 13));
+        SoundCraft.LOGGER.info("BurnerScreenHandler created");
+        this.player = player;
+        this.context = context;
+        this.inventory = new SimpleInventory(1){
+            @Override
+            public void markDirty() {
+                super.markDirty();
+                BurnerScreenHandler.this.onContentChanged(this);
+            }
 
+            @Override
+            public void setStack(int slot, ItemStack stack) {
+                SoundCraft.LOGGER.info("Inventory.setStack");
+                super.setStack(slot, stack);
+            }
+        };
+        this.addSlot(new ModCDSlot(inventory, 0, 17, 13));
         addPlayerInventory(playerInventory);
         addPlayerHotbar(playerInventory);
+        if(!player.getWorld().isClient()) {
+            SoundCraftServerNetworkManager.getInstance().registerDataProvider("available_songs", this::provideAvailable);
+        }
     }
     private void checkPlaylist() {
         for(String path : this.playlist.keySet()) {
@@ -68,13 +101,14 @@ public class BurnerScreenHandler extends ScreenHandler {
         this.updatePlaylist(false);
     }
     public void updatePlaylist(boolean force) {
+        SoundCraft.LOGGER.info("Update Playlist");
         NbtCompound cdNbt = this.cd().getNbt();
         if(cdNbt == null) {
             cdNbt = new NbtCompound();
             cdNbt.put("songs", new NbtList());
         }
-        NbtList addedSongs = cdNbt.getList("songs", NbtType.COMPOUND).copy();
         NbtList songs = this.getAvailable();
+        NbtList addedSongs = cdNbt.getList("songs", NbtType.COMPOUND).copy();
         HashMap<String, NbtCompound> playlist = new HashMap<>(songs.size());
         for(NbtElement e : songs) {
             NbtCompound song = (NbtCompound) e;
@@ -117,17 +151,9 @@ public class BurnerScreenHandler extends ScreenHandler {
                 addedSongs.add(cleanSong);
             }
         }
-        NbtCompound newCdNbt = new NbtCompound();
-        newCdNbt.put("songs", addedSongs.copy());
-        //this.slots.get(0).getStack().setNbt(newCdNbt);
-        //this.slots.get(0).getStack().setCount(2);
-        this.slots.get(0).setStack(new ItemStack(ModItems.PORTABLE_RADIO));
-        // Notify server please !!!!!!!!!!!!!!!!!!!!!!!!!!
-        // Notify server please !!!!!!!!!!!!!!!!!!!!!!!!!!
-        // Notify server please !!!!!!!!!!!!!!!!!!!!!!!!!!
-        // Notify server please !!!!!!!!!!!!!!!!!!!!!!!!!!
-        // Notify server please !!!!!!!!!!!!!!!!!!!!!!!!!!
-        this.sendContentUpdates();
+        NbtCompound nbt = this.slots.get(0).getStack().getOrCreateNbt().copy();
+        nbt.put("songs", addedSongs.copy());
+        this.slots.get(0).getStack().setNbt(nbt);
         try {
             BufferedWriter writer = new BufferedWriter(new FileWriter(this.MUSIC_INDEX.toFile()));
             NbtCompound newIndex = new NbtCompound();
@@ -140,8 +166,12 @@ public class BurnerScreenHandler extends ScreenHandler {
             writer.close();
         } catch(Exception e1) {
             e1.printStackTrace();
+            return;
         }
         this.updatePlaylist(true);
+        this.context.run((World world, BlockPos blockPos) -> {
+            SoundCraftServerNetworkManager.getInstance().broadcastCacheData("available_songs");
+        });
     }
     public void registerUpdateHandler(PlaylistUpdateHandler handler) {
         this.updateHandler = handler;
@@ -152,9 +182,38 @@ public class BurnerScreenHandler extends ScreenHandler {
     public HashMap<String, NbtCompound> getPlaylist() {
         return this.playlist;
     }
-
+    public PacketByteBuf provideAvailable() {
+        NbtList list = this.getAvailableOnServer();
+        NbtCompound compound = new NbtCompound();
+        compound.put("songs", list);
+        return PacketByteBufs.create().writeNbt(compound);
+    }
+    public void updateAvailable(PacketByteBuf buf) {
+        this.updatePlaylist(true);
+    }
     public NbtList getAvailable() {
+        if(this.player.getWorld().isClient()) {
+            return this.getAvailableOnClient();
+        } else {
+            return this.getAvailableOnServer();
+        }
+    }
+    @Environment(EnvType.CLIENT)
+    public NbtList getAvailableOnClient() {
+        Pending<PacketByteBuf> response = SoundCraftClientNetworkManager.getInstance().getCached("available_songs");
+        response.setCallback(this::updateAvailable);
+        NbtCompound nbt = null;
         try {
+            nbt = response.get().readNbt();
+        } catch(Exception ignored){}
+        if(nbt == null)
+            return new NbtList();
+        return nbt.getList("songs", NbtType.COMPOUND);
+    }
+    @Environment(EnvType.SERVER)
+    public NbtList getAvailableOnServer() {
+        try {
+            SoundCraft.LOGGER.info("Reading from file");
             BufferedReader index = new BufferedReader(new FileReader(this.MUSIC_INDEX.toFile()));
             StringBuilder data = new StringBuilder();
             while(true) {
@@ -187,18 +246,19 @@ public class BurnerScreenHandler extends ScreenHandler {
     public boolean canUse(PlayerEntity player) {
         return this.inventory.canPlayerUse(player);
     }
-
     @Override
-    protected boolean insertItem(ItemStack stack, int startIndex, int endIndex, boolean fromLast) {
-        boolean canInsertItem = super.insertItem(stack, startIndex, endIndex, fromLast);
-        this.updatePlaylist();
-        return canInsertItem;
+    public void onSoundCraftScreenPacket(PlayerEntity player, int buttonId, String[] data) {
+        String path = data[0];
+        switch (buttonId) {
+            case 0 -> this.addSong(path);
+            case 1 -> this.removeSong(path);
+            case 2 -> this.deleteSong(path);
+        }
     }
 
     @Override
-    public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
-        super.onSlotClick(slotIndex, button, actionType, player);
-        this.updatePlaylist();
+    public void setCursorStack(ItemStack stack) {
+        super.setCursorStack(stack);
     }
 
     @Override
@@ -222,9 +282,15 @@ public class BurnerScreenHandler extends ScreenHandler {
                 slot.markDirty();
             }
         }
-        this.updatePlaylist();
         return newStack;
     }
+
+    @Override
+    public void onContentChanged(Inventory inventory) {
+        this.context.run((world, pos) -> this.sendContentUpdates());
+        this.updatePlaylist();
+    }
+
     private void addPlayerInventory(PlayerInventory playerInventory) {
         for (int i = 0; i < 3; ++i) {
             for (int l = 0; l < 9; ++l) {
@@ -244,6 +310,12 @@ public class BurnerScreenHandler extends ScreenHandler {
             player.getInventory().offerOrDrop(cdSlot);
         }
         super.close(player);
+    }
+
+    @Override
+    public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
+        SoundCraft.LOGGER.info("OnSlotClick");
+        super.onSlotClick(slotIndex, button, actionType, player);
     }
 
     public interface PlaylistUpdateHandler {

@@ -20,6 +20,9 @@
   "entrypoints": {
     "main": [
       "de.ideaonic703.soundcraft.SoundCraft"
+    ],
+    "client": [
+      "de.ideaonic703.soundcraft.SoundCraftClient"
     ]
   },
   "mixins": [

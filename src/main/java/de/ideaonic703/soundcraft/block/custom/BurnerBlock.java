@@ -1,19 +1,19 @@
 package de.ideaonic703.soundcraft.block.custom;
 
-import de.ideaonic703.soundcraft.block.entity.BurnerBlockEntity;
-import de.ideaonic703.soundcraft.block.entity.ModBlockEntities;
+import de.ideaonic703.soundcraft.screen.BurnerScreenHandler;
 import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.NamedScreenHandlerFactory;
+import net.minecraft.screen.ScreenHandlerContext;
+import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
+import net.minecraft.stat.Stats;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.DirectionProperty;
 import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.BlockMirror;
 import net.minecraft.util.BlockRotation;
@@ -24,7 +24,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-public class BurnerBlock extends BlockWithEntity implements BlockEntityProvider {
+public class BurnerBlock extends HorizontalFacingBlock {
     //HorizontalFacingBlock
     public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
 
@@ -53,38 +53,26 @@ public class BurnerBlock extends BlockWithEntity implements BlockEntityProvider 
     public BlockState getPlacementState(ItemPlacementContext ctx) {
         return this.getDefaultState().with(Properties.HORIZONTAL_FACING, ctx.getPlayerFacing().getOpposite());
     }
-
-    @Override
-    public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack itemStack) {
-        super.onPlaced(world, pos, state, placer, itemStack);
-    }
-
-    //***Block Entity***
-    @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
-        if (!world.isClient()) {
-            NamedScreenHandlerFactory screenHandlerFactory = state.createScreenHandlerFactory(world, pos);
-            if (screenHandlerFactory != null) {
-                player.openHandledScreen(screenHandlerFactory);
-            }
-        }
-        return ActionResult.SUCCESS;
-    }
-
     @Override
     public BlockRenderType getRenderType(BlockState state) {
         return BlockRenderType.MODEL;
     }
 
-    @Nullable
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
-        return new BurnerBlockEntity(pos, state);
+    public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack itemStack) {
+        super.onPlaced(world, pos, state, placer, itemStack);
     }
-
-    @Nullable
+    //***Screen***
     @Override
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        return checkType(type, ModBlockEntities.BURNER_BLOCK, BurnerBlockEntity::tick);
+    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
+        if (world.isClient) {
+            return ActionResult.SUCCESS;
+        }
+        player.openHandledScreen(state.createScreenHandlerFactory(world, pos));
+        return ActionResult.CONSUME;
+    }
+    @Override
+    public NamedScreenHandlerFactory createScreenHandlerFactory(BlockState state, World world, BlockPos pos) {
+        return new SimpleNamedScreenHandlerFactory((syncId, inventory, player) -> new BurnerScreenHandler(syncId, inventory, ScreenHandlerContext.create(world, pos), player), Text.translatable("block.soundcraft.cd_burner"));
     }
 }
